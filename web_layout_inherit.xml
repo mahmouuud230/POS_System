@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    File: odoo/addons/pwa_pos_ios/views/web_layout_inherit.xml
+
+    Inherits the root Odoo layout template to inject:
+      1. Apple PWA / Standalone meta tags (iPhone X + iPhone 13 compatible)
+      2. theme-color for the iOS status bar
+      3. apple-touch-icon links (192 px and 512 px — place PNG files in
+         static/src/img/)
+      4. Web App Manifest link
+      5. Viewport meta (ensures correct scaling on all iPhones)
+
+    IMPORTANT: After installing this module run
+        docker compose exec odoo odoo -u pwa_pos_ios -d <SHOP_DB> --stop-after-init
+    to update the templates in the tenant database.
+-->
+<odoo>
+    <template id="pwa_head_meta" name="PWA iOS Head Meta Tags"
+              inherit_id="web.layout" priority="12">
+
+        <!-- Insert right after the existing <head> viewport meta -->
+        <xpath expr="//head/meta[@name='viewport']" position="after">
+
+            <!-- ── PWA / Standalone mode ──────────────────────────────── -->
+            <!-- Legacy Apple tag — required for iOS < 16.4 -->
+            <meta name="apple-mobile-web-app-capable" content="yes"/>
+            <!-- Modern W3C equivalent (Safari 17+) -->
+            <meta name="mobile-web-app-capable" content="yes"/>
+
+            <!-- Status bar style: default | black | black-translucent
+                 "black-translucent" overlays the status bar on your content
+                 and gives a full-bleed look on iPhone X+ (with notch).
+                 Use "default" for a safe white bar. -->
+            <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+
+            <!-- App title shown below the icon on the iOS home screen -->
+            <meta name="apple-mobile-web-app-title" content="POS"/>
+
+            <!-- Chrome / Android PWA status bar colour -->
+            <meta name="theme-color" content="#714B67"/>
+
+            <!-- ── Safe-area insets for iPhone X notch / Dynamic Island ─ -->
+            <!--   These CSS env() vars are consumed by scanner.css         -->
+            <!--   No extra meta needed — they are available automatically  -->
+            <!--   when viewport-fit=cover is set (see viewport override).  -->
+
+            <!-- ── Touch icons ───────────────────────────────────────────
+                 Place 192×192 and 512×512 PNG files in:
+                   pwa_pos_ios/static/src/img/icon-192.png
+                   pwa_pos_ios/static/src/img/icon-512.png
+                 iOS picks the best-fit size automatically.             -->
+            <link rel="apple-touch-icon" sizes="192x192"
+                  href="/pwa_pos_ios/static/src/img/icon-192.png"/>
+            <link rel="apple-touch-icon" sizes="512x512"
+                  href="/pwa_pos_ios/static/src/img/icon-512.png"/>
+
+            <!-- ── Web App Manifest ───────────────────────────────────── -->
+            <!--   The manifest.json is served as a QWeb route (see
+                   controllers/pwa.py).  It drives the "Add to Home Screen"
+                   prompt on Android and is respected by Safari 17+.     -->
+            <link rel="manifest" href="/pwa/manifest.json"/>
+
+        </xpath>
+
+        <!-- Override the existing viewport meta to add viewport-fit=cover
+             (required for notch-aware safe-area-inset env() vars)        -->
+        <xpath expr="//head/meta[@name='viewport']" position="replace">
+            <meta name="viewport"
+                  content="width=device-width, initial-scale=1, maximum-scale=1,
+                           user-scalable=no, viewport-fit=cover"/>
+        </xpath>
+
+    </template>
+
+    <!-- ── Back-navigation button injected in Standalone mode ──────────── -->
+    <!--   iOS removes the browser's ← button in standalone/fullscreen mode.
+          We inject a lightweight DOM element that only appears when
+          window.navigator.standalone === true (detected in JS).
+          Styled via scanner.css; JS logic in pwa_service_worker_register.js. -->
+    <template id="pwa_back_button" name="PWA Back Button"
+              inherit_id="web.layout" priority="13">
+        <xpath expr="//body" position="inside">
+            <div id="pwa-back-btn" class="pwa-back-btn d-none" role="button"
+                 aria-label="Go back">
+                <!-- SVG chevron — no external font dependency -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                     viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+            </div>
+        </xpath>
+    </template>
+
+</odoo>

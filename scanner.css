@@ -1,0 +1,129 @@
+/*
+ * File: pwa_pos_ios/static/src/css/scanner.css
+ *
+ * Styles for:
+ *   • QR/Barcode scanner modal viewport
+ *   • iOS safe-area insets (notch, Dynamic Island, home indicator)
+ *   • Standalone-mode back button
+ */
+
+/* ── iOS safe-area body padding ─────────────────────────────────────────────
+   When viewport-fit=cover is set in the <meta viewport> tag, iOS gives us
+   env() variables for the safe areas around the notch / Dynamic Island.
+   We apply them to the <body> so all content respects the hardware layout.  */
+body {
+    /* Top: status bar on iPhone X+ */
+    padding-top:    env(safe-area-inset-top, 0px);
+    /* Bottom: home indicator bar on iPhone X+ */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left:   env(safe-area-inset-left, 0px);
+    padding-right:  env(safe-area-inset-right, 0px);
+}
+
+/* ── Standalone back button ─────────────────────────────────────────────────
+   Fixed in top-left corner; sits on top of the Odoo navbar.
+   Only visible when running as a Home Screen PWA (JS adds .d-none removal). */
+.pwa-back-btn {
+    position: fixed;
+    /* Push below the iOS status bar */
+    top:  calc(env(safe-area-inset-top, 0px) + 8px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
+    z-index: 9999;
+    width:  40px;
+    height: 40px;
+    border-radius: 50%;
+    background:  rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    /* Smooth show/hide */
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    /* Tap highlight */
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
+    color: #333;
+}
+
+.pwa-back-btn:active {
+    transform: scale(0.92);
+}
+
+/* ── Scanner widget container ───────────────────────────────────────────────*/
+.pwa-scanner-widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+/* The large camera-trigger button */
+.pwa-scan-btn {
+    min-width: 140px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1rem;
+    /* Prevent accidental double-tap zoom on iOS */
+    touch-action: manipulation;
+}
+
+/* Viewport that holds the Html5-Qrcode video feed */
+.pwa-scan-viewport {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+/* The div the library renders <video> into */
+.pwa-scan-region {
+    width:  100%;
+    max-width: 320px;
+    border-radius: 12px;
+    overflow: hidden;
+    /* Subtle framing border */
+    border: 2px solid #714B67;
+    background: #000;
+}
+
+/* Override the default Html5-Qrcode scanning border (orange → brand color) */
+#pwa-qr-scan-region > div {
+    border: 5px solid #714B67 !important;
+}
+
+.pwa-scan-result {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.pwa-scanner-error {
+    font-size: 0.85rem;
+    max-width: 300px;
+    text-align: center;
+}
+
+/* ── Full-bleed scanner overlay (optional — activate via JS class toggle) ── */
+.pwa-scan-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Account for notch and home bar */
+    padding-top:    env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pwa-scan-overlay .pwa-scan-region {
+    max-width: 90vw;
+    border-color: #fff;
+}

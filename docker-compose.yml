@@ -1,0 +1,117 @@
+##############################################################################
+# Odoo 18 Community — Multi-Tenant SaaS Stack
+# Services: Odoo 18 | PostgreSQL 15 | Nginx Proxy Manager
+# Model:    Single Odoo instance / Multiple isolated databases
+##############################################################################
+
+version: "3.9"
+
+# ─── Named volumes (local, no S3) ───────────────────────────────────────────
+volumes:
+  odoo-data:        # /var/lib/odoo  (filestore, sessions)
+  postgres-data:    # /var/lib/postgresql/data
+  npm-data:         # Nginx Proxy Manager SQLite DB
+  npm-letsencrypt:  # Let's Encrypt certs
+
+# ─── Isolated backend network ────────────────────────────────────────────────
+networks:
+  odoo-net:
+    driver: bridge
+
+services:
+
+  # ── PostgreSQL 15 ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: odoo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-odoo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB:       postgres           # master DB; tenant DBs created separately
+      PGDATA:            /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro  # optional init scripts
+    networks:
+      - odoo-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-odoo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Harden: never expose port 5432 to the host
+    # (Odoo reaches it via the internal odoo-net)
+
+  # ── Odoo 18.0 Community ────────────────────────────────────────────────────
+  odoo:
+    image: odoo:18.0
+    container_name: odoo-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # These are read by the entrypoint and override odoo.conf values
+      HOST:     postgres
+      PORT:     5432
+      USER:     ${POSTGRES_USER:-odoo}
+      PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ./odoo/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./odoo/addons:/mnt/extra-addons:ro      # custom / community modules
+    networks:
+      - odoo-net
+    # Do NOT expose 8069 directly; Nginx Proxy Manager handles TLS termination
+    expose:
+      - "8069"
+      - "8072"   # longpolling for live chat / bus
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    # Resource limits — tune per VPS size
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # ── Nginx Proxy Manager ────────────────────────────────────────────────────
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"      # HTTP  (redirects to HTTPS)
+      - "443:443"    # HTTPS
+      - "81:81"      # NPM admin UI  ← close this port in UFW after initial setup
+    volumes:
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
+    networks:
+      - odoo-net
+    depends_on:
+      odoo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:81/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+##############################################################################
+# Quick-start (copy into .env at project root before first run):
+#
+#   POSTGRES_USER=odoo
+#   POSTGRES_PASSWORD=ChangeThisSecurePassword123!
+#
+# Then:
+#   docker compose up -d
+#   # Visit http://<SERVER_IP>:81 to configure NPM (admin@example.com / changeme)
+#   # Close port 81 in UFW once NPM is configured
+##############################################################################
